@@ -25,4 +25,4 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           WELCOME_CHANNEL: ${{ vars.WELCOME_CHANNEL || '👋 présentations' }}
         run: |
-          timeout 5h50m python bot_assistant_fm.py || true
+          timeout 21000 python bot_assistant_fm.py || true
