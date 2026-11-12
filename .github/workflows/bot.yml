@@ -1,0 +1,28 @@
+name: Assistant FM - Bot d'accueil
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+concurrency:
+  group: assistant-fm-bot
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run welcome bot
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          WELCOME_CHANNEL: ${{ vars.WELCOME_CHANNEL || '👋 présentations' }}
+        run: |
+          timeout 5h50m python bot_assistant_fm.py || true
