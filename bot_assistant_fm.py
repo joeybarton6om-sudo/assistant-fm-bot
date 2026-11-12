@@ -2,9 +2,9 @@
 Bot d'accueil Assistant FM.
 
 Fonction :
-  - À chaque nouveau membre, envoie un message de bienvenue dans un salon.
-  - Les salons sont résolus par mot-clé (insensible aux emojis/casse) pour
-    produire de vrais liens cliquables.
+  - À chaque nouveau membre, envoie un message de bienvenue dans le salon d'accueil.
+  - Les salons sont ciblés par ID (mentions cliquables garanties), avec repli
+    par mot-clé si un ID est introuvable.
   - Commande !accueil-test pour tester le rendu.
 
 Prérequis :
@@ -15,7 +15,6 @@ Prérequis :
   3. Inviter le bot avec : Voir les salons, Envoyer des messages, Lire l'historique.
   4. Variables d'environnement :
        $env:DISCORD_TOKEN = "..."
-       $env:WELCOME_CHANNEL = "👋 présentations"   # optionnel
   5. Lancer : python bot_assistant_fm.py
 """
 
@@ -26,16 +25,18 @@ import discord
 from discord.ext import commands
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
-WELCOME_CHANNEL = os.environ.get("WELCOME_CHANNEL", "👋 présentations")
 
 DOWNLOAD_URL = "https://www.dropbox.com/t/Gz5RY46Ncc7brDVM"
 
-# Salons à mentionner : (libellé, mot-clé de recherche)
+# Salon où poster le message de bienvenue
+SALON_ACCUEIL_ID = 1570447936469471284
+
+# Salons à mentionner : (libellé, ID, mot-clé de repli)
 SALONS_A_MENTIONNER = [
-    ("Présente-toi", "présentation"),
-    ("Raconte ta partie", "partie"),
-    ("Questions", "aide"),
-    ("Bugs", "bug"),
+    ("Présente-toi", 1570447934225649734, "présentation"),
+    ("Raconte ta partie", 1570447942647545969, "partie"),
+    ("Questions", 1570447962134421725, "aide"),
+    ("Bugs", 1570447963585781812, "bug"),
 ]
 
 
@@ -55,8 +56,7 @@ def normaliser(texte):
     return re.sub(r"[^\w\s]", "", (texte or "").lower()).strip()
 
 
-def trouver_salon(guild, mot_cle):
-    """Trouve un salon textuel dont le nom contient le mot-clé (insensible aux emojis)."""
+def trouver_par_mot_cle(guild, mot_cle):
     cle = normaliser(mot_cle)
     if not cle:
         return None
@@ -66,12 +66,21 @@ def trouver_salon(guild, mot_cle):
     return None
 
 
+def resoudre_salon(guild, channel_id, mot_cle=None):
+    """Résout un salon par ID, puis par mot-clé en repli."""
+    ch = guild.get_channel(int(channel_id))
+    if isinstance(ch, discord.TextChannel):
+        return ch
+    if mot_cle:
+        return trouver_par_mot_cle(guild, mot_cle)
+    return None
+
+
 def trouver_salon_accueil(guild):
-    """Salon d'accueil : mot-clé 'présentation', sinon 'général', sinon 1er salon accessible."""
-    ch = trouver_salon(guild, "présentation")
+    ch = resoudre_salon(guild, SALON_ACCUEIL_ID, "présentation")
     if ch is not None:
         return ch
-    ch = trouver_salon(guild, "général")
+    ch = trouver_par_mot_cle(guild, "général")
     if ch is not None:
         return ch
     return next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
@@ -88,8 +97,8 @@ def construire_embed(member):
     guild = member.guild
 
     lignes = []
-    for libelle, mot_cle in SALONS_A_MENTIONNER:
-        ch = trouver_salon(guild, mot_cle)
+    for libelle, channel_id, mot_cle in SALONS_A_MENTIONNER:
+        ch = resoudre_salon(guild, channel_id, mot_cle)
         if ch is not None:
             lignes.append(f"• {libelle} → {ch.mention}")
 
